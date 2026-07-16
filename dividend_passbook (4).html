@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>股利存摺</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3EEE1;
+    --paper-line:#DCD3B8;
+    --ink:#25302B;
+    --ink-soft:#5C6259;
+    --stamp-red:#A6332B;
+    --stamp-red-soft:#c7796f;
+    --ledger-green:#2F5D50;
+    --gold:#9C7A2E;
+    --white:#FBF9F2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 34px, var(--paper-line) 35px);
+    font-family:'Noto Sans TC', sans-serif;
+    color:var(--ink);
+    padding:28px 16px 60px;
+  }
+  .book{
+    max-width:880px;
+    margin:0 auto;
+    background:var(--white);
+    border-radius:4px;
+    box-shadow:0 1px 0 rgba(0,0,0,0.05), 0 12px 30px rgba(37,48,43,0.12);
+    position:relative;
+    overflow:hidden;
+  }
+  .book::before{
+    content:"";
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:26px;
+    background:repeating-linear-gradient(180deg, var(--paper) 0 10px, transparent 10px 22px);
+    border-right:1px dashed #C9BE9E;
+  }
+  .cover{
+    padding:34px 40px 26px 58px;
+    background:linear-gradient(135deg,#2F5D50,#25453B);
+    color:var(--white);
+    position:relative;
+  }
+  .cover h1{
+    font-family:'Noto Serif TC', serif;
+    font-weight:900;
+    font-size:30px;
+    margin:0 0 4px;
+    letter-spacing:2px;
+  }
+  .cover p{
+    margin:0;
+    font-size:13px;
+    color:#CFE0D8;
+    letter-spacing:1px;
+  }
+  .stamp{
+    position:absolute;
+    right:36px; top:28px;
+    width:64px;height:64px;
+    border:3px solid var(--stamp-red-soft);
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--stamp-red-soft);
+    font-family:'Noto Serif TC',serif;
+    font-weight:900;
+    font-size:13px;
+    transform:rotate(-12deg);
+    opacity:0.9;
+  }
+  .body-pad{ padding:26px 32px 20px 58px; }
+
+  .lookup-row{
+    display:flex; gap:10px; align-items:stretch; flex-wrap:wrap;
+  }
+  .lookup-row input[type=text]{
+    flex:1; min-width:160px;
+    padding:12px 14px;
+    border:1.5px solid #D8CFB4;
+    border-radius:6px;
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .lookup-row input[type=text]:focus{ outline:2px solid var(--ledger-green); border-color:var(--ledger-green); }
+  button{
+    font-family:'Noto Sans TC', sans-serif;
+    font-weight:700;
+    border:none;
+    border-radius:6px;
+    padding:12px 20px;
+    cursor:pointer;
+    font-size:14px;
+    transition:transform .08s ease, box-shadow .15s ease;
+  }
+  button:active{ transform:scale(0.97); }
+  .btn-primary{ background:var(--ledger-green); color:var(--white); }
+  .btn-primary:disabled{ background:#9db3ab; cursor:wait; }
+  .btn-ghost{ background:transparent; color:var(--ink-soft); border:1.5px solid #D8CFB4; }
+  .btn-danger{ background:transparent; color:var(--stamp-red); border:1.5px solid var(--stamp-red-soft); padding:6px 10px; font-size:12px;}
+
+  .hint{ font-size:12px; color:var(--ink-soft); margin-top:8px; line-height:1.6;}
+
+  .preview-card{
+    margin-top:18px;
+    border:1.5px dashed var(--gold);
+    border-radius:8px;
+    padding:18px 20px;
+    background:#FFFDF6;
+    display:none;
+  }
+  .preview-card.show{ display:block; }
+  .preview-title{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:17px;
+    margin-bottom:12px;
+    color:var(--ledger-green);
+  }
+  .field-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
+    gap:10px 14px;
+  }
+  .field{ display:flex; flex-direction:column; gap:4px; }
+  .field label{ font-size:11px; color:var(--ink-soft); letter-spacing:0.5px; }
+  .field input{
+    padding:8px 10px;
+    border:1px solid #E1D8BD;
+    border-radius:5px;
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+  }
+  .preview-actions{ margin-top:16px; display:flex; gap:10px; }
+
+  .ledger{ margin-top:28px; }
+  .ledger-title{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:16px;
+    color:var(--ink);
+    border-bottom:2px solid var(--ink);
+    padding-bottom:8px;
+    margin-bottom:6px;
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .ledger-title span{ font-size:12px; color:var(--ink-soft); font-weight:400; }
+
+  table{ width:100%; border-collapse:collapse; font-family:'Space Mono', monospace; font-size:13px;}
+  thead th{
+    text-align:left; font-family:'Noto Sans TC',sans-serif; font-weight:500;
+    font-size:11px; color:var(--ink-soft); padding:8px 6px; border-bottom:1px solid #E1D8BD;
+  }
+  tbody td{ padding:10px 6px; border-bottom:1px dotted #E1D8BD; vertical-align:middle;}
+  tbody tr:hover{ background:#FBF6E8; }
+  .stock-name{ font-family:'Noto Sans TC',sans-serif; font-weight:700; }
+  .stock-code{ color:var(--ink-soft); font-size:11px; }
+  .num{ text-align:right; }
+  .yield-tag{
+    display:inline-block; padding:2px 8px; border-radius:20px;
+    background:#EAF3EE; color:var(--ledger-green); font-weight:700; font-size:12px;
+  }
+  .empty-row td{ text-align:center; color:var(--ink-soft); padding:26px 0; font-family:'Noto Sans TC',sans-serif;}
+
+  .months{
+    margin-top:30px;
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:10px;
+  }
+  @media (max-width:560px){ .months{ grid-template-columns:repeat(2,1fr);} }
+  .month-box{
+    border:1px solid #E1D8BD;
+    border-radius:8px;
+    padding:12px 10px;
+    background:#FFFDF6;
+    min-height:66px;
+    position:relative;
+  }
+  .month-box.has-income{ border-color:var(--stamp-red-soft); background:#FFF7F3; }
+  .month-num{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:13px; color:var(--ink-soft); }
+  .month-amt{ font-family:'Space Mono',monospace; font-weight:700; font-size:16px; margin-top:4px; }
+  .month-box.has-income .month-amt{ color:var(--stamp-red); }
+  .month-empty{ color:#C9BE9E; font-size:13px; margin-top:4px;}
+
+  .totals-row{
+    margin-top:26px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+  @media (max-width:560px){ .totals-row{ grid-template-columns:1fr; } }
+  .grand-total{
+    display:flex; justify-content:space-between; align-items:center;
+    background:linear-gradient(135deg,#2F5D50,#25453B);
+    color:var(--white);
+    padding:20px 24px;
+    border-radius:8px;
+  }
+  .grand-total.market-value{
+    background:linear-gradient(135deg,#9C7A2E,#7A5E20);
+  }
+  .grand-total .label{ font-family:'Noto Serif TC',serif; font-size:15px; }
+  .grand-total .amount{ font-family:'Space Mono',monospace; font-weight:700; font-size:26px; }
+
+  .status{ font-size:12px; margin-top:10px; min-height:16px; }
+  .status.err{ color:var(--stamp-red); }
+  .status.ok{ color:var(--ledger-green); }
+</style>
+</head>
+<body>
+  <div class="book">
+    <div class="cover">
+      <div class="stamp">已<br>入帳</div>
+      <h1>股利存摺</h1>
+      <p>輸入股票代號，自動查詢股利資訊，累計每月可領現金</p>
+    </div>
+    <div class="body-pad">
+
+      <div class="lookup-row">
+        <input type="text" id="codeInput" placeholder="輸入股票代號，例如 2330" maxlength="10">
+        <button class="btn-primary" id="lookupBtn">查詢股利</button>
+      </div>
+      <div class="hint">資料透過 AI 網路查詢，時效性與正確性請以公司公告或證交所資訊為準。查到後可先確認、調整持股數量再加入存摺。</div>
+      <div class="status" id="statusMsg"></div>
+
+      <div class="preview-card" id="previewCard">
+        <div class="preview-title" id="previewTitle">查詢結果</div>
+        <div class="field-grid">
+          <div class="field"><label>股票名稱</label><input id="f_name"></div>
+          <div class="field"><label>現金股利（元/股）</label><input id="f_cash" type="number" step="0.01"></div>
+          <div class="field"><label>股票股利（元/股）</label><input id="f_stock" type="number" step="0.01"></div>
+          <div class="field"><label>股價</label><input id="f_price" type="number" step="0.01"></div>
+          <div class="field"><label>除權息日</label><input id="f_exdate" placeholder="YYYY-MM-DD"></div>
+          <div class="field"><label>配息（發放）日</label><input id="f_paydate" placeholder="YYYY-MM-DD"></div>
+          <div class="field"><label>持有股數</label><input id="f_shares" type="number" step="1" value="1000"></div>
+        </div>
+        <div class="preview-actions">
+          <button class="btn-primary" id="addBtn">加入存摺</button>
+          <button class="btn-ghost" id="cancelBtn">取消</button>
+        </div>
+      </div>
+
+      <div class="ledger">
+        <div class="ledger-title">持股明細 <span id="countLabel">共 0 檔</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>股票</th>
+              <th class="num">現金股利</th>
+              <th class="num">股票股利</th>
+              <th class="num">股價</th>
+              <th class="num">殖利率</th>
+              <th>除權息日</th>
+              <th>配息日</th>
+              <th class="num">持股</th>
+              <th class="num">應收現金</th>
+              <th class="num">市值</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr class="empty-row"><td colspan="11">存摺目前是空的，查詢股票代號後加入吧</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ledger">
+        <div class="ledger-title">每月現金入帳<span></span></div>
+        <div class="months" id="monthsGrid"></div>
+      </div>
+
+      <div class="totals-row">
+        <div class="grand-total">
+          <div class="label">年度現金股利總計</div>
+          <div class="amount" id="grandTotal">NT$ 0</div>
+        </div>
+        <div class="grand-total market-value">
+          <div class="label">存摺總市值</div>
+          <div class="amount" id="grandMarketValue">NT$ 0</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+let holdings = []; // {code,name,cash_dividend,stock_dividend,price,ex_dividend_date,payment_date,shares}
+let pendingParsed = null;
+
+const $ = (id) => document.getElementById(id);
+const statusMsg = $('statusMsg');
+const previewCard = $('previewCard');
+const lookupBtn = $('lookupBtn');
+const codeInput = $('codeInput');
+
+function setStatus(msg, type){
+  statusMsg.textContent = msg || '';
+  statusMsg.className = 'status' + (type ? ' '+type : '');
+}
+
+function fmtMoney(n){
+  n = Math.round(n);
+  return 'NT$ ' + n.toLocaleString('en-US');
+}
+
+const LOCAL_KEY = 'dividend_passbook_holdings_v1';
+
+function loadHoldings(){
+  try{
+    const raw = localStorage.getItem(LOCAL_KEY);
+    holdings = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    holdings = [];
+    setStatus('這個瀏覽器無法儲存資料（可能是隱私模式或本機安全性限制），資料只能暫存在這次畫面，重新整理就會消失', 'err');
+  }
+  render();
+}
+
+function persistHoldings(){
+  try{
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(holdings));
+  }catch(e){
+    setStatus('儲存失敗，這個瀏覽器可能限制了本機儲存空間', 'err');
+  }
+}
+
+function saveHolding(item){
+  persistHoldings();
+}
+
+function removeHolding(code){
+  holdings = holdings.filter(h => h.code !== code);
+  persistHoldings();
+  render();
+}
+
+function extractMonth(dateStr){
+  if(!dateStr) return null;
+  const m = dateStr.match(/(\d{4})[-\/](\d{1,2})/);
+  if(m) return parseInt(m[2], 10);
+  return null;
+}
+
+function render(){
+  const tbody = $('tableBody');
+  $('countLabel').textContent = '共 ' + holdings.length + ' 檔';
+  if(holdings.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">存摺目前是空的，查詢股票代號後加入吧</td></tr>';
+  } else {
+    tbody.innerHTML = holdings.map(h => {
+      const yieldPct = h.price ? (h.cash_dividend / h.price * 100).toFixed(2) : '-';
+      const cashTotal = (h.cash_dividend || 0) * (h.shares || 0);
+      const marketValue = (h.price || 0) * (h.shares || 0);
+      return `<tr>
+        <td><div class="stock-name">${h.name || '-'}</div><div class="stock-code">${h.code}</div></td>
+        <td class="num">${(h.cash_dividend ?? '-')}</td>
+        <td class="num">${(h.stock_dividend ?? '-')}</td>
+        <td class="num">${(h.price ?? '-')}</td>
+        <td class="num"><span class="yield-tag">${yieldPct}%</span></td>
+        <td>${h.ex_dividend_date || '-'}</td>
+        <td>${h.payment_date || '-'}</td>
+        <td class="num">${(h.shares || 0).toLocaleString('en-US')}</td>
+        <td class="num">${fmtMoney(cashTotal)}</td>
+        <td class="num">${fmtMoney(marketValue)}</td>
+        <td><button class="btn-danger" data-code="${h.code}">移除</button></td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.btn-danger').forEach(btn => {
+      btn.addEventListener('click', () => removeHolding(btn.dataset.code));
+    });
+  }
+
+  // monthly aggregation
+  const monthTotals = Array(12).fill(0);
+  holdings.forEach(h => {
+    const m = extractMonth(h.payment_date);
+    if(m && m >= 1 && m <= 12){
+      monthTotals[m-1] += (h.cash_dividend || 0) * (h.shares || 0);
+    }
+  });
+  const monthsGrid = $('monthsGrid');
+  monthsGrid.innerHTML = monthTotals.map((amt, i) => {
+    const has = amt > 0;
+    return `<div class="month-box ${has ? 'has-income' : ''}">
+      <div class="month-num">${i+1} 月</div>
+      ${has ? `<div class="month-amt">${fmtMoney(amt)}</div>` : `<div class="month-empty">— 無</div>`}
+    </div>`;
+  }).join('');
+
+  const grand = monthTotals.reduce((a,b) => a+b, 0);
+  $('grandTotal').textContent = fmtMoney(grand);
+
+  const grandMarketValue = holdings.reduce((sum, h) => sum + (h.price || 0) * (h.shares || 0), 0);
+  $('grandMarketValue').textContent = fmtMoney(grandMarketValue);
+}
+
+function extractJson(text){
+  const matches = text.match(/\{[\s\S]*\}/g);
+  if(!matches || matches.length === 0) return null;
+  const last = matches[matches.length - 1];
+  return JSON.parse(last);
+}
+
+async function lookupStock(code){
+  const prompt = `請搜尋台灣股票代號「${code}」最新一次公告的股利資訊。只回傳一個 JSON物件，不要有其他任何文字、說明或 markdown 符號，格式如下（找不到的欄位填 null）：
+{"code":"${code}","name":"公司名稱","cash_dividend":現金股利數字,"stock_dividend":股票股利數字,"price":目前股價數字,"ex_dividend_date":"YYYY-MM-DD","payment_date":"YYYY-MM-DD"}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: prompt }],
+      tools: [{ type: "web_search_20250305", name: "web_search" }]
+    })
+  });
+
+  if(!res.ok){
+    throw new Error('查詢服務暫時無法使用（' + res.status + '）');
+  }
+  const data = await res.json();
+  const textBlocks = (data.content || [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('\n');
+  const parsed = extractJson(textBlocks);
+  if(!parsed) throw new Error('查無法解析的股利資料，請手動輸入');
+  return parsed;
+}
+
+function showPreview(parsed){
+  pendingParsed = parsed;
+  $('previewTitle').textContent = (parsed.name || parsed.code) + '（' + parsed.code + '）查詢結果';
+  $('f_name').value = parsed.name || '';
+  $('f_cash').value = parsed.cash_dividend ?? '';
+  $('f_stock').value = parsed.stock_dividend ?? '';
+  $('f_price').value = parsed.price ?? '';
+  $('f_exdate').value = parsed.ex_dividend_date || '';
+  $('f_paydate').value = parsed.payment_date || '';
+  $('f_shares').value = 1000;
+  previewCard.classList.add('show');
+}
+
+lookupBtn.addEventListener('click', async () => {
+  const code = codeInput.value.trim();
+  if(!code){ setStatus('請輸入股票代號', 'err'); return; }
+  lookupBtn.disabled = true;
+  setStatus('查詢中，請稍候…', '');
+  previewCard.classList.remove('show');
+  try{
+    const parsed = await lookupStock(code);
+    showPreview(parsed);
+    setStatus('查詢完成，請確認欄位後加入存摺', 'ok');
+  }catch(err){
+    setStatus(err.message || '查詢失敗，請手動輸入資料', 'err');
+    showPreview({ code, name: '', cash_dividend: null, stock_dividend: null, price: null, ex_dividend_date: '', payment_date: '' });
+  }finally{
+    lookupBtn.disabled = false;
+  }
+});
+
+$('cancelBtn').addEventListener('click', () => {
+  previewCard.classList.remove('show');
+  pendingParsed = null;
+});
+
+$('addBtn').addEventListener('click', async () => {
+  if(!pendingParsed) return;
+  const item = {
+    code: pendingParsed.code,
+    name: $('f_name').value.trim(),
+    cash_dividend: parseFloat($('f_cash').value) || 0,
+    stock_dividend: parseFloat($('f_stock').value) || 0,
+    price: parseFloat($('f_price').value) || 0,
+    ex_dividend_date: $('f_exdate').value.trim(),
+    payment_date: $('f_paydate').value.trim(),
+    shares: parseInt($('f_shares').value) || 0
+  };
+  if(!item.name){ setStatus('請至少填寫股票名稱', 'err'); return; }
+  holdings = holdings.filter(h => h.code !== item.code);
+  holdings.push(item);
+  await saveHolding(item);
+  render();
+  previewCard.classList.remove('show');
+  pendingParsed = null;
+  codeInput.value = '';
+  setStatus('已加入存摺：' + item.name, 'ok');
+});
+
+codeInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') lookupBtn.click();
+});
+
+loadHoldings();
+</script>
+</body>
+</html>
