@@ -229,9 +229,9 @@
 
       <div class="lookup-row">
         <input type="text" id="codeInput" placeholder="輸入股票代號，例如 2330" maxlength="10">
-        <button class="btn-primary" id="lookupBtn">查詢股利</button>
+        <button class="btn-primary" id="lookupBtn">新增股票</button>
       </div>
-      <div class="hint">資料透過 AI 網路查詢，時效性與正確性請以公司公告或證交所資訊為準。查到後可先確認、調整持股數量再加入存摺。</div>
+      <div class="hint">請先到 Goodinfo、MoneyDJ 或證交所公告查好股利資料，再填入下方欄位加入存摺。</div>
       <div class="status" id="statusMsg"></div>
 
       <div class="preview-card" id="previewCard">
@@ -405,44 +405,9 @@ function render(){
   $('grandMarketValue').textContent = fmtMoney(grandMarketValue);
 }
 
-function extractJson(text){
-  const matches = text.match(/\{[\s\S]*\}/g);
-  if(!matches || matches.length === 0) return null;
-  const last = matches[matches.length - 1];
-  return JSON.parse(last);
-}
-
-async function lookupStock(code){
-  const prompt = `請搜尋台灣股票代號「${code}」最新一次公告的股利資訊。只回傳一個 JSON物件，不要有其他任何文字、說明或 markdown 符號，格式如下（找不到的欄位填 null）：
-{"code":"${code}","name":"公司名稱","cash_dividend":現金股利數字,"stock_dividend":股票股利數字,"price":目前股價數字,"ex_dividend_date":"YYYY-MM-DD","payment_date":"YYYY-MM-DD"}`;
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
-      tools: [{ type: "web_search_20250305", name: "web_search" }]
-    })
-  });
-
-  if(!res.ok){
-    throw new Error('查詢服務暫時無法使用（' + res.status + '）');
-  }
-  const data = await res.json();
-  const textBlocks = (data.content || [])
-    .filter(b => b.type === 'text')
-    .map(b => b.text)
-    .join('\n');
-  const parsed = extractJson(textBlocks);
-  if(!parsed) throw new Error('查無法解析的股利資料，請手動輸入');
-  return parsed;
-}
-
 function showPreview(parsed){
   pendingParsed = parsed;
-  $('previewTitle').textContent = (parsed.name || parsed.code) + '（' + parsed.code + '）查詢結果';
+  $('previewTitle').textContent = (parsed.name || parsed.code) + '（' + parsed.code + '）';
   $('f_name').value = parsed.name || '';
   $('f_cash').value = parsed.cash_dividend ?? '';
   $('f_stock').value = parsed.stock_dividend ?? '';
@@ -453,22 +418,11 @@ function showPreview(parsed){
   previewCard.classList.add('show');
 }
 
-lookupBtn.addEventListener('click', async () => {
+lookupBtn.addEventListener('click', () => {
   const code = codeInput.value.trim();
   if(!code){ setStatus('請輸入股票代號', 'err'); return; }
-  lookupBtn.disabled = true;
-  setStatus('查詢中，請稍候…', '');
-  previewCard.classList.remove('show');
-  try{
-    const parsed = await lookupStock(code);
-    showPreview(parsed);
-    setStatus('查詢完成，請確認欄位後加入存摺', 'ok');
-  }catch(err){
-    setStatus(err.message || '查詢失敗，請手動輸入資料', 'err');
-    showPreview({ code, name: '', cash_dividend: null, stock_dividend: null, price: null, ex_dividend_date: '', payment_date: '' });
-  }finally{
-    lookupBtn.disabled = false;
-  }
+  setStatus('請填入股利資料後按「加入存摺」', '');
+  showPreview({ code, name: '', cash_dividend: null, stock_dividend: null, price: null, ex_dividend_date: '', payment_date: '' });
 });
 
 $('cancelBtn').addEventListener('click', () => {
