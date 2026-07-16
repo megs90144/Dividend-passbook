@@ -229,9 +229,9 @@
 
       <div class="lookup-row">
         <input type="text" id="codeInput" placeholder="輸入股票代號，例如 2330" maxlength="10">
-        <button class="btn-primary" id="lookupBtn">新增股票</button>
+        <button class="btn-primary" id="lookupBtn">查詢股利</button>
       </div>
-      <div class="hint">請先到 Goodinfo、MoneyDJ 或證交所公告查好股利資料，再填入下方欄位加入存摺。</div>
+      <div class="hint">資料來源為 FinMind 公開股市資料。通常是「最近一次已公告」的股利資訊，若公司今年度尚未公告，欄位會是空的，請自行查證並填入、或手動輸入。</div>
       <div class="status" id="statusMsg"></div>
 
       <div class="preview-card" id="previewCard">
@@ -407,7 +407,8 @@ function render(){
 
 function showPreview(parsed){
   pendingParsed = parsed;
-  $('previewTitle').textContent = (parsed.name || parsed.code) + '（' + parsed.code + '）';
+  const label = parsed.name ? (parsed.name + '（' + parsed.code + '）') : parsed.code;
+  $('previewTitle').textContent = label;
   $('f_name').value = parsed.name || '';
   $('f_cash').value = parsed.cash_dividend ?? '';
   $('f_stock').value = parsed.stock_dividend ?? '';
@@ -418,11 +419,96 @@ function showPreview(parsed){
   previewCard.classList.add('show');
 }
 
-lookupBtn.addEventListener('click', () => {
+const FINMIND_BASE = 'https://api.finmindtrade.com/api/v4/data';
+const STOCK_INFO_CACHE_KEY = 'tw_stock_info_cache_v1';
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function fmtDate(d){
+  return d.toISOString().slice(0, 10);
+}
+
+async function fetchStockName(code){
+  try{
+    let cache = null;
+    try{ cache = JSON.parse(localStorage.getItem(STOCK_INFO_CACHE_KEY) || 'null'); }catch(e){}
+    if(!cache || (Date.now() - cache.ts) > ONE_DAY_MS){
+      const res = await fetch(`${FINMIND_BASE}?dataset=TaiwanStockInfo`);
+      const json = await res.json();
+      const map = {};
+      (json.data || []).forEach(row => { map[row.stock_id] = row.stock_name; });
+      cache = { ts: Date.now(), map };
+      try{ localStorage.setItem(STOCK_INFO_CACHE_KEY, JSON.stringify(cache)); }catch(e){}
+    }
+    return cache.map[code] || '';
+  }catch(e){
+    return '';
+  }
+}
+
+async function fetchLatestPrice(code){
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 20);
+  const url = `${FINMIND_BASE}?dataset=TaiwanStockPrice&data_id=${encodeURIComponent(code)}&start_date=${fmtDate(start)}&end_date=${fmtDate(end)}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  const rows = json.data || [];
+  if(rows.length === 0) return null;
+  return rows[rows.length - 1].close;
+}
+
+async function fetchDividend(code){
+  const url = `${FINMIND_BASE}?dataset=TaiwanStockDividend&data_id=${encodeURIComponent(code)}&start_date=2023-01-01`;
+  const res = await fetch(url);
+  const json = await res.json();
+  const rows = json.data || [];
+  if(rows.length === 0) return null;
+  const latest = rows[rows.length - 1];
+  return {
+    cash_dividend: latest.CashEarningsDistribution ?? null,
+    stock_dividend: latest.StockEarningsDistribution ?? null,
+    ex_dividend_date: latest.CashExDividendTradingDate || latest.StockExDividendTradingDate || '',
+    payment_date: latest.CashDividendPaymentDate || ''
+  };
+}
+
+async function lookupStock(code){
+  const [name, price, dividend] = await Promise.all([
+    fetchStockName(code),
+    fetchLatestPrice(code).catch(() => null),
+    fetchDividend(code).catch(() => null)
+  ]);
+  return {
+    code,
+    name: name || '',
+    cash_dividend: dividend ? dividend.cash_dividend : null,
+    stock_dividend: dividend ? dividend.stock_dividend : null,
+    price: price,
+    ex_dividend_date: dividend ? dividend.ex_dividend_date : '',
+    payment_date: dividend ? dividend.payment_date : ''
+  };
+}
+
+lookupBtn.addEventListener('click', async () => {
   const code = codeInput.value.trim();
   if(!code){ setStatus('請輸入股票代號', 'err'); return; }
-  setStatus('請填入股利資料後按「加入存摺」', '');
-  showPreview({ code, name: '', cash_dividend: null, stock_dividend: null, price: null, ex_dividend_date: '', payment_date: '' });
+  lookupBtn.disabled = true;
+  setStatus('查詢中，請稍候…', '');
+  previewCard.classList.remove('show');
+  try{
+    const parsed = await lookupStock(code);
+    showPreview(parsed);
+    if(!parsed.name && parsed.cash_dividend == null && parsed.price == null){
+      setStatus('查無資料，請手動填入欄位', 'err');
+    }else{
+      setStatus('查詢完成，請核對欄位後加入存摺', 'ok');
+    }
+  }catch(err){
+    setStatus('查詢失敗（可能是網路限制），請手動輸入資料', 'err');
+    showPreview({ code, name: '', cash_dividend: null, stock_dividend: null, price: null, ex_dividend_date: '', payment_date: '' });
+  }finally{
+    lookupBtn.disabled = false;
+  }
 });
 
 $('cancelBtn').addEventListener('click', () => {
